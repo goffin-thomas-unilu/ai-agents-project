@@ -43,10 +43,24 @@ def main() -> int:
         #     temperature=0.0
         #     max_tokens=200
         #   Assign the result to `reply`.
-        reply = None
+        reply = client.chat.completions.create(
+            model=SMALL.name,
+            messages = [{"role":"user","content": QUESTION}],
+            temperature =0.0,
+            max_tokens=200
+            )
 
         elapsed = time.perf_counter() - started
 
+        print(reply)
+        answer = reply.choices[0].message.content
+        finish_reason = reply.choices[0].finish_reason
+        total_token = reply.usage.total_tokens
+        completion_token = reply.usage.completion_tokens
+        print("the answer is " + answer + ", \n the finish reason :"+finish_reason+" total token = " +str(total_token) + ", completion token =" +str(completion_token)+ ", temps attente ="+str(elapsed))
+
+
+        print("Answer ")
         if reply is None:
             print("TODO 1 is not done yet: `reply` is still None.")
             print("Open this file and make the call. The four lines you "
@@ -70,11 +84,26 @@ def main() -> int:
     #
     print("\n--- TODO 2: print the four things here ---\n")
 
+    print("the answer is " + answer + ", \n the finish reason :"+finish_reason+" total token = " +str(total_token) +"prompt token= "+str(reply.usage.prompt_tokens) +", completion token =" +str(completion_token)+ ", temps attente ="+str(elapsed))
+    # le finish reason peut être soit stop : le modèle a fini de lui même / soit être length : le modèle a atteint le nombre de max_tokens, il a donc été coupé
+
+    if finish_reason == 'stop':
+        print("FINISH REASON :\n le model a fini de lui meme, a atteint son objectif")
+    else:
+        print("celui-ci a été coupé, il a atteint le nombre de max_tokens")
+
+    print("les prompts que l'on controle sont les prompts tokens indirectement (provenant de la question) \n alors que completions tokens compte la réponse générée, on ne la controle pas directement mais on peut le plafonner")
+    print("le temps attendu est :" + str(elapsed))
     # TODO 3. Close the trace.
     #   Call rec.finish(...) with:
     #     output=  the answer text
     #     outcome= "ok"
     #   It writes to artifacts/traces.jsonl by itself.
+
+    rec.finish(
+        output= reply.choices[0].message.content,
+        outcome="ok"
+    )
     #
     #   Then run, from your repository root:
     #     python -m project.verify
