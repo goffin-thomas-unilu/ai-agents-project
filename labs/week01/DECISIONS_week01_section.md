@@ -9,18 +9,25 @@ to write.
 ## Week 1
 
 **Run conditions.** Everything below was produced on:
-
-- machine: [make, chip, RAM]
-- model: [the model name, exactly as `ollama list` prints it]
+HP Laptop 15s-fq5xxx
+Type du système:                            x64-based PC
+Processeur(s):                              1 processeur(s) installé(s).
+                                            [01] : Intel64 Family 6 Model 154 Stepping 4 GenuineIntel ~1300 MHz
+- machine: [HP ,HP Laptop 15s-fq5xxx, 16go DDR4]
+- model: [
+    qwen2.5:7b                 845dbda0ea48    4.7 GB    35 hours ago    
+    nomic-embed-text:latest    0a109f422b47    274 MB    35 hours ago    
+    qwen3:4b-instruct          0edcdef34593    2.5 GB    35 hours ago
+    ]
 - served by: Ollama, one request at a time, locally
-- date: [YYYY-MM-DD]
+- date: [17/09/2026]
 
 Every number in this file is meaningless without those four lines, so they
 are stated once here and referred to rather than repeated.
 
 ### 1. Machine and model set
 
-I am running the [required / required plus optional] model set.
+I am running the [required] model set.
 
 [If you could not run the optional models, say so and say what you will do
 before week 9. This is a constraint on your project, not a failure, and
@@ -29,31 +36,35 @@ naming it now is worth more than discovering it in week 9.]
 ### 2. The first call
 
 | | |
-| finish reason | |
-| prompt tokens | |
-| completion tokens | |
-| elapsed | |
+| finish reason | stop |
+| prompt tokens | 24 |
+| completion tokens | 49 |
+| elapsed | 8.5 |
 
 One sentence on the finish reason: what my program would do differently if
 it came back as a truncation rather than a normal stop.
+
+--> It would be 'length' to signify that the model reach the max token output inserted as parameters
 
 [...]
 
 ### 3. Variance
 
 | cell | distinct (recording) | distinct (mine) | median latency |
-| closed_short, t=0.0 | 1/12 | | |
-| closed_short, t=1.0 | 1/12 | | |
-| open_list, t=0.0 | 1/12 | | |
-| open_list, t=1.0 | 11/12 | | |
+| closed_short, t=0.0 | 1/12 |1/6 |0.31 |
+| closed_short, t=1.0 | 1/12 |1/6 |0.26 |
+| open_list, t=0.0 | 1/12 |1/6 |4.30 |
+| open_list, t=1.0 | 11/12 |6/6 |3.78 |
 
 Which cell still returns a single answer at temperature 1.0, and why that
-one:
+one: it is the closed_short because the model focus on a single answer so this answer has a very high probability compare to other even if the model has a high level of creativity
 
 [...]
 
 Which cells a test asserting exact string equality would pass on, and what
 that tells me about testing this system:
+It would pass on closed_short because the result remains the same at each execution, but will fail for open_list with temp=1
+So a test asserting exact string equality does not depend on the temperature but maybe on the question 
 
 [...]
 

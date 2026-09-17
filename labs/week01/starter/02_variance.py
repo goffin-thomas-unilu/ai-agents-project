@@ -143,6 +143,26 @@ def main() -> int:
     #        of these cells and fail on others. Name which, and say what
     #        that tells you about testing this system.
 
+
+    '''
+    avec un appel --replay
+    cell                       distinct   chars   median s
+------------------------------------------------------
+    closed_short|t00               1/12      10       0.17
+    closed_short|t10               1/12      10       0.17
+    open_list|t00                  1/12     189       1.10
+    open_list|t10                 11/12     178       1.14
+
+    avec un call sans --replay
+    cell                       distinct   chars   median s
+    ------------------------------------------------------
+    closed_short|t00               1/6      10       0.31
+    closed_short|t10               1/6      10       0.26
+    open_list|t00                  1/6     241       4.30
+    open_list|t10                  6/6     186       3.78
+    '''
+
+
     # TODO 6. Then write down the one sentence that carries into week 10.
     #
     #   You will be tempted to write "the model is random". Resist it, the
