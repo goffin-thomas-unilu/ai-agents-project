@@ -75,13 +75,13 @@ otherwise in most cells.]
 
 ### 4. The cold start
 
-- cold call: [ ] s
-- warm call: [ ] s
-- ratio: [ ]
+- cold call: 6.245 s
+- warm call: 0.332 s
+- ratio: 18.776
 
 What this implies for a system that uses more than one model, and what I
 will do about it:
-
+This can imply that maybe there will be a cold start when I want to use an other model and return to the original because this will at each time free the memory of the model and so the response time will be much larger than usual with only one model or just keep multiple models running in RAM
 [...]
 
 ### 5. Cost, estimated

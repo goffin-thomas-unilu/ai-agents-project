@@ -74,7 +74,10 @@ def main() -> int:
     #   Then answer, in DECISIONS.md: your system will call two different
     #   models. What does this measurement tell you about switching between
     #   them inside one request, and what would you do instead?
-
+    subprocess.run(["ollama", "stop", SMALL.name])
+    reply_cold, sec_cold = timed(client,SHORT,SMALL.name)
+    reply_hot, sec_hot = timed(client,SHORT,SMALL.name)
+    print("ratio between hot / cold = " + str(sec_cold/sec_hot) + ", cold = " +str(sec_cold) + ", hot = " +str(sec_hot))
     # TODO 8. Estimate what a real evaluation run would cost hosted.
     #
     #   In week 10 you build a golden set and run it. Assume 200 cases, each
@@ -83,6 +86,13 @@ def main() -> int:
     #
     #   Use project.prices.estimate(input_tokens, output_tokens, tier=...)
     #   and compute it on the "small" tier and on the "large" tier.
+
+    project.prices.estimate(input_tokens, output_tokens, tier='small')
+
+    long_prompt_tokens = rows[1]["prompt_tokens"] 
+    long_completion_tokens = rows[1]["completion_tokens"]
+    project.prices.estimate(input_tokens, output_tokens, tier='long')
+    
     #
     #   Print both, then write the two numbers in DECISIONS.md next to one
     #   sentence: which tier would you run nightly, which would you run
