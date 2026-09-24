@@ -89,15 +89,15 @@ This can imply that maybe there will be a cold start when I want to use an other
 A 200-case golden set, at the token cost of my long case:
 
 | | one run | nightly for the semester |
-| small tier | | |
-| large tier | | |
+| small tier |0.0335 |0 |
+| large tier |2.4912 |28 |
 
 Estimates against the price list dated [date in `project/prices.py`], not
 measurements. Running locally, my actual monetary cost was zero.
 
 Which tier I would run nightly, which I would run before a release, and why
 not the same one for both:
-
+I would run the small one nightly and the large one before a release and not the same for both situation because we could either have no real results/ undetailed results or paid for too much even if we ask a simple thing, this will cost way more with the large than the small
 [...]
 
 ### Deferred

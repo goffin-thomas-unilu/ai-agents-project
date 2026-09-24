@@ -87,11 +87,24 @@ def main() -> int:
     #   Use project.prices.estimate(input_tokens, output_tokens, tier=...)
     #   and compute it on the "small" tier and on the "large" tier.
 
-    project.prices.estimate(input_tokens, output_tokens, tier='small')
 
     long_prompt_tokens = rows[1]["prompt_tokens"] 
     long_completion_tokens = rows[1]["completion_tokens"]
-    project.prices.estimate(input_tokens, output_tokens, tier='long')
+
+    total_input_tokens = long_prompt_tokens * 200
+    total_output_tokens = long_completion_tokens * 200
+
+    cost_small_one_run = estimate(total_input_tokens, total_output_tokens, tier="small")
+    cost_large_one_run = estimate(total_input_tokens, total_output_tokens, tier="large")
+
+    cost_small_nightly = int(cost_small_one_run.input_cost + cost_small_one_run.output_cost) * 14
+    cost_large_nightly = int(cost_large_one_run.input_cost + cost_large_one_run.output_cost) * 14
+
+    print(f"Small tier — one run: {(cost_small_one_run.input_cost + cost_small_one_run.output_cost):.4f}€, "
+          f"{14} nights: {cost_small_nightly:.2f}€")
+    print(f"Large tier — one run: {(cost_large_one_run.input_cost + cost_large_one_run.output_cost):.4f}€, "
+          f"{14} nights: {cost_large_nightly:.2f}€")
+    print(f"(Estimates against the price list dated {PRICE_DATE}, not measurements.)")
     
     #
     #   Print both, then write the two numbers in DECISIONS.md next to one
