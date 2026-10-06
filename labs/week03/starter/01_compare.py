@@ -112,6 +112,7 @@ def main() -> int:
     m_tok, m_secs = totals(mono_metas)
     r_tok, r_secs = totals(metas_c, metas_a)
     c_tok, _ = totals(metas_c)
+    print(c_tok,m_tok,r_tok)
     print(f"\n{'':<12}{'tokens':>10}{'seconds':>10}")
     print(f"{'monolith':<12}{m_tok:>10}{m_secs:>10.1f}")
     print(f"{'router':<12}{r_tok:>10}{r_secs:>10.1f}")
@@ -129,6 +130,49 @@ def main() -> int:
         "monolith_tokens": m_tok, "router_tokens": r_tok,
         "routing_call_tokens": c_tok,
     })
+
+    gold_data, source_type = load_or_reference("artifacts/goldset.json")
+    print(f"Loaded goldset from: {source_type}")
+
+    # Reconstitution/Chargement du GoldSet
+    gold_set = GoldSet.model_validate(gold_data) if isinstance(gold_data, dict) else gold_data
+
+    # On collecte les case_id existants pour éviter les doublons lors des ré-exécutions
+    existing_ids = {case.case_id for case.case_id in gold_set.cases}
+
+    for q in QUERIES:
+        if q.id in existing_ids:
+            continue
+
+        # Définition des tags pour le slicing
+        slice_tags = [f"lang:{q.lang}", f"route:{q.gold_route}"]
+        is_ambiguous = getattr(q, "is_ambiguous", False)
+        if is_ambiguous:
+            slice_tags.append("ambiguous")
+
+        # Explication du comportement attendu
+        if is_ambiguous:
+            expected_behavior = (
+                f"Query is ambiguous; convention routes to '{q.gold_route}'."
+            )
+        else:
+            expected_behavior = (
+                f"Query should be routed directly to the '{q.gold_route}' specialist."
+            )
+
+        new_case = GoldCase(
+            case_id=q.id,
+            week_added=3,
+            input_text=q.text,
+            expected={"route": q.gold_route},
+            expected_behavior=expected_behavior,
+            slice_tags=slice_tags,
+        )
+        gold_set.cases.append(new_case)
+
+    # Sauvegarde du fichier goldset mis à jour
+    write_json("artifacts/goldset.json", gold_set.model_dump())
+    print(f"Updated goldset saved to artifacts/goldset.json ({len(gold_set.cases)} total cases)")
 
     # TODO 6. Grow the gold set.
     #
@@ -153,6 +197,7 @@ def main() -> int:
     #   understand best.
     #
     #   Skip any case_id already in the file, so this is safe to re-run.
+
 
     # TODO 7. Answer four questions in DECISIONS.md. The comparison is the
     # deliverable, not the two running systems.

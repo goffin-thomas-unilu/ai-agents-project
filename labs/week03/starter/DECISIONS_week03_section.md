@@ -77,14 +77,16 @@ route definition on every call, and the specialists carry only their own.]
 
 One thing a specialist can be forbidden to do that the monolith cannot be
 given:
+Strict negative constraints without instruction drift (e.g., forbidding info from taking actions, or refund from answering without policy checks). A monolith mixes all rules together, which leads to conflicts and compliance leaks.
 
 [...]
 
-Would I ship the router: [ ]. Evidence: [ ]. What would change my mind: [ ].
+Would I ship the router:A larger benchmark (100+ queries/route) showing clear gains or proof that specialist isolation significantly cuts safety violations.
+
 
 ### 6. Stretch variant
 
-Variant assigned: [ ]. Result: [ ].
+Variant assigned: model routing. Result: [ ].
 
 [For model routing: report both models on accuracy, evidence verbatim, the
 confidence range, and resident memory. If the smaller model won, say so

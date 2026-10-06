@@ -67,6 +67,47 @@ def score_routes(results, queries) -> RouteScore:
     wrong, whether the evidence was verbatim, which policy check fired, the
     confidence value, and whether the query was one of the ambiguous four.
     """
+    score = RouteScore()
+
+    for r, q in zip(results, queries):
+        gold = q.gold_route
+        applied = r.applied_route
+
+        # 1. Mise à jour du total général
+        score.total += 1
+
+        # 2. Compteur par route [hits, total]
+        if gold not in score.per_route:
+            score.per_route[gold] = [0, 0]
+        score.per_route[gold][1] += 1  # Total pour cette route
+
+        is_hit = gold == applied
+        if is_hit:
+            score.per_route[gold][0] += 1  # Succès pour cette route
+
+        # 3. Matrice de confusion (uniquement en cas d'erreur)
+        else:
+            score.confusion[(gold, applied)] += 1
+
+        # 4. Traitement des 4 requêtes ambiguës
+        if getattr(q, "is_ambiguous", False):
+            score.ambiguous_total += 1
+            if is_hit:
+                score.ambiguous_hits += 1
+
+        # 5. Vérification de l'evidence exacte (verbatim)
+        if r.evidence_ok:
+            score.evidence_ok += 1
+
+        # 6. Enregistrement de la règle de politique déclenchée
+        if r.policy_fired is not None:
+            score.policy_fired[r.policy_fired] += 1
+
+        # 7. Collecte des niveaux de confiance du classifieur
+        if r.decision is not None:
+            score.confidences.append(r.decision.confidence)
+
+    return score
     raise NotImplementedError("TODO 5: score the routes")
 
 
