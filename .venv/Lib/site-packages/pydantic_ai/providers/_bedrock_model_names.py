@@ -1,0 +1,120 @@
+"""Helpers for normalizing Amazon Bedrock model identifiers.
+
+Bedrock model IDs carry a `<provider>.` segment (e.g. `anthropic.`, `amazon.`) and,
+on the legacy `InvokeModel`/`Converse` APIs, a `-v<n>(:<m>)?` version suffix and an
+optional cross-region inference geo prefix (`us.`, `eu.`, ...): e.g.
+`us.anthropic.claude-haiku-4-5-20251001-v1:0`.
+
+These live in a boto3-free module so both [`BedrockProvider`][pydantic_ai.providers.bedrock.BedrockProvider]
+(which needs boto3) and [`AnthropicProvider`][pydantic_ai.providers.anthropic.AnthropicProvider]
+(which talks to Bedrock via `AsyncAnthropicBedrock`/`AsyncAnthropicBedrockMantle` and doesn't)
+can share them.
+"""
+
+from __future__ import annotations as _annotations
+
+import re
+
+from ..settings import CacheRetention
+
+__all__ = (
+    'BEDROCK_GEO_PREFIXES',
+    'bedrock_claude_cache_retentions',
+    'bedrock_lacks_claude_structured_output',
+    'remove_bedrock_geo_prefix',
+    'split_bedrock_model_id',
+)
+
+# Known geo prefixes for cross-region inference profile IDs
+BEDROCK_GEO_PREFIXES: tuple[str, ...] = ('us', 'eu', 'apac', 'jp', 'au', 'ca', 'in', 'global', 'us-gov')
+
+_VERSION_SUFFIX_RE = re.compile(r'(.+)-v\d+(?::\d+)?$')
+
+
+def remove_bedrock_geo_prefix(model_name: str) -> str:
+    """Remove the cross-region inference geographic prefix from a model ID if present.
+
+    Bedrock supports cross-region inference using geographic prefixes like
+    `us.`, `eu.`, `apac.`, etc. This function strips those prefixes.
+
+    Example:
+        `us.amazon.titan-embed-text-v2:0` -> `amazon.titan-embed-text-v2:0`
+        `amazon.titan-embed-text-v2:0` -> `amazon.titan-embed-text-v2:0`
+    """
+    for prefix in BEDROCK_GEO_PREFIXES:
+        if model_name.startswith(f'{prefix}.'):
+            return model_name.removeprefix(f'{prefix}.')
+    return model_name
+
+
+def split_bedrock_model_id(model_id: str) -> tuple[str | None, str]:
+    """Split a Bedrock model ID into its `<provider>` segment and the bare model name.
+
+    Strips any cross-region inference geo prefix and `-v<n>(:<m>)?` version suffix.
+
+    Example:
+        `us.anthropic.claude-haiku-4-5-20251001-v1:0` -> `('anthropic', 'claude-haiku-4-5-20251001')`
+        `anthropic.claude-haiku-4-5` -> `('anthropic', 'claude-haiku-4-5')`
+        `claude-haiku-4-5` -> `(None, 'claude-haiku-4-5')`
+    """
+    provider, _, name = remove_bedrock_geo_prefix(model_id).partition('.')
+    if not name:  # no `<provider>.` segment
+        return None, model_id
+    if version_match := _VERSION_SUFFIX_RE.match(name):
+        name = version_match.group(1)
+    return provider, name
+
+
+# The Claude models whose Bedrock entry lists both the 5-minute and the 1-hour cache TTL; the others
+# (Claude 3.7 Sonnet, Claude 3.5 Sonnet v2) only take the default 5 minutes. Bare names, as
+# `split_bedrock_model_id` returns them; a prefix also covers later point releases (`claude-opus-5-5`).
+# https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html#prompt-caching-models
+_ONE_HOUR_CACHE_CLAUDE_MODEL_PREFIXES = (
+    'claude-fable-5',
+    'claude-haiku-4-5',
+    'claude-mythos-5',
+    'claude-opus-4-5',
+    'claude-opus-4-6',
+    'claude-opus-4-7',
+    'claude-opus-4-8',
+    'claude-opus-5',
+    'claude-sonnet-4-5',
+    'claude-sonnet-4-6',
+    'claude-sonnet-5',
+)
+
+
+def bedrock_claude_cache_retentions(model_name: str) -> tuple[CacheRetention, ...]:
+    """The prompt-cache retention tiers Bedrock supports for a Claude model.
+
+    Accepts a full Bedrock model ID (e.g. `us.anthropic.claude-sonnet-4-5-20250929-v1:0`) or a bare
+    model name (e.g. `claude-sonnet-4-5-20250929`).
+    """
+    _, name = split_bedrock_model_id(model_name)
+    return ('5m', '1h') if name.startswith(_ONE_HOUR_CACHE_CLAUDE_MODEL_PREFIXES) else ('5m',)
+
+
+# The Claude models with structured output (JSON schema output and strict tool use) on the direct Anthropic
+# API that Bedrock Runtime doesn't serve it for, on either Converse or InvokeModel. Bare names, as
+# `split_bedrock_model_id` returns them; a prefix also covers later point releases.
+# https://platform.claude.com/docs/en/build-with-claude/structured-outputs
+# https://docs.aws.amazon.com/bedrock/latest/userguide/structured-output.html
+_STRUCTURED_OUTPUT_UNSUPPORTED_CLAUDE_MODEL_PREFIXES = (
+    'claude-opus-4-1',
+    'claude-opus-4-7',
+    'claude-opus-4-8',
+    'claude-opus-5',
+    'claude-sonnet-5',
+    'claude-haiku-5-5',
+    'claude-fable-5',
+)
+
+
+def bedrock_lacks_claude_structured_output(model_name: str) -> bool:
+    """Whether Bedrock Runtime withholds the structured output a Claude model has on the direct Anthropic API.
+
+    Accepts a full Bedrock model ID (e.g. `global.anthropic.claude-sonnet-5`) or a bare model name
+    (e.g. `claude-sonnet-5`).
+    """
+    _, name = split_bedrock_model_id(model_name)
+    return name.startswith(_STRUCTURED_OUTPUT_UNSUPPORTED_CLAUDE_MODEL_PREFIXES)
