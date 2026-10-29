@@ -69,6 +69,13 @@ class MemoryStore:
         and the wrong one for a real service holding residents' data. If you
         keep it, say so rather than leaving it unsaid.
         """
+        handle = f"fact-{secrets.token_hex(6)}"
+        self.facts.append(Fact(
+            subject=subject, kind=kind, text=text, handle=handle,
+            written_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        ))
+        self.save()
+        return handle
         raise NotImplementedError("TODO 1: append a fact, return a handle")
 
     # ----------------------------------------------------------------
@@ -90,6 +97,16 @@ class MemoryStore:
         Then answer, at the checkpoint: what does k cost you in tokens per
         call, and what happens when the store holds four hundred facts?
         """
+        words = set(query.lower().split())
+        scored = []
+        for f in self.facts:
+            if f.subject != subject:        # d'abord, on filtre sur le sujet
+                continue
+            score = len(words & set(f.text.lower().split()))
+            if score > 0:
+                scored.append((score, f.text))
+        scored.sort(key=lambda pair: -pair[0])
+        return [text for _, text in scored[:k]]
         raise NotImplementedError("TODO 2: search, scoped to the subject")
 
     # ----------------------------------------------------------------
@@ -107,6 +124,12 @@ class MemoryStore:
         already copied into a running conversation's messages. Deleting the
         fact does not un-say it.
         """
+        before = len(self.facts)
+        self.facts = [f for f in self.facts if f.handle != handle]
+        existed = len(self.facts) < before
+        if existed:
+            self.save()
+        return existed
         raise NotImplementedError("TODO 3: hard delete by handle")
 
     # ----------------------------------------------------------------

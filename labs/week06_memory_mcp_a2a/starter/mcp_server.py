@@ -94,6 +94,77 @@ app = MCPServer("memory-desk")
 # server have had to hold between calls if there were no handle, and what
 # would that cost you when a second instance appears behind a load balancer?
 
+# --------------------------------------------------------------------------
+# TODO 4. The memory tools, over the wire.
+# --------------------------------------------------------------------------
+
+@app.tool()
+def remember(subject: str, kind: str, fact: str) -> str:
+    """Store one fact about a resident and return a handle for it.
+
+    Use it when the resident states something worth keeping for later, such as
+    a preference, an address change or an earlier request. Do NOT use it for
+    handbook facts, fees or opening hours, and do not store anything the
+    resident did not say. Returns the handle of the new fact, for example
+    'fact-3fa91c07b2d4'. Keep it if the fact may have to be deleted later.
+    """
+    store = MemoryStore.load()          # loaded per call, never cached
+    return store.write(subject, kind, fact)
+
+
+@app.tool()
+def recall(subject: str, query: str, k: int = 3) -> list[str]:
+    """Return at most k remembered facts about ONE resident, best match first.
+
+    Send a few keywords as the query, not a full sentence. Use it before
+    answering a question that may depend on what the resident said earlier.
+    Do NOT use it for handbook facts, which come from search_services.
+    An empty list means nothing is remembered about this resident for this
+    query: say so plainly and never invent a fact.
+    """
+    store = MemoryStore.load()
+    return store.search(subject, query, k)
+
+
+@app.tool()
+def forget(handle: str) -> bool:
+    """Permanently delete one remembered fact by its handle.
+
+    Use it only when the resident asks for a fact to be deleted, with the
+    handle returned by remember. Returns true if the fact existed and is now
+    deleted, false if the handle matched nothing. Deleting a fact does not
+    remove it from the current conversation.
+    """
+    store = MemoryStore.load()
+    return store.forget(handle)
+
+
+# --------------------------------------------------------------------------
+# TODO 5. The handle, which is the week's central move.
+# --------------------------------------------------------------------------
+
+@app.tool()
+def open_case(subject: str) -> str:
+    """Open a case for a resident and return its handle, for example
+    'case-3fa91c07b2d4'.
+
+    Use it once at the start of a piece of ongoing work, then pass the handle
+    to later calls instead of repeating who the resident is. Do NOT open a new
+    case for every message.
+    """
+    store = MemoryStore.load()
+    return store.open_case(subject)
+
+
+@app.tool()
+def case_subject(handle: str) -> str | None:
+    """Return the resident a case handle belongs to.
+
+    Returns null when the handle is unknown: say so and ask for a valid
+    handle, never guess the resident.
+    """
+    store = MemoryStore.load()
+    return store.subject_of(handle)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8000"))

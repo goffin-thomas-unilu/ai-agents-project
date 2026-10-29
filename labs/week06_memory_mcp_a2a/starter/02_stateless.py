@@ -56,8 +56,16 @@ def serve(port: int, stateless: bool) -> None:
 # to carry its own protocolVersion, clientInfo, and capabilities, because
 # under this revision there is no handshake that established them earlier.
 # Look at the specification for the exact field names before you guess.
-SELF_DESCRIBING = {}   # TODO 7a
-
+SELF_DESCRIBING = {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/list",
+    "params": {
+        "protocolVersion": "2024-11-05",
+        "clientInfo": {"name": "memory-desk-client", "version": "1.0"},
+        "capabilities": {}
+    }
+}
 
 def raw_post(port: int, body: dict) -> tuple[int, dict[str, str], str]:
     """One HTTP request. No SDK, because the SDK is what hides the headers."""
@@ -117,7 +125,11 @@ def main() -> int:
     # session mode. If your third check passes in both modes, you have
     # rebuilt the broken version.
     stateless, session = rows
-    checks = {}   # TODO 7b
+    checks = {
+        "Stateless server answers": stateless["answered"],
+        "Stateless server issues no session ID": not stateless["session_id"],
+        "Request refused in session mode": session["status"] != 200,
+    }
     print()
     for name, passed in checks.items():
         print(f"  [{'PASS' if passed else 'FAIL'}] {name}")

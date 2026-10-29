@@ -47,6 +47,29 @@ async def main() -> int:
     file is a file. 02_stateless.py is the demonstration that actually
     distinguishes the two, and it is the next thing you run.
     """
+    # 1. Le catalogue d'outils, reçu par HTTP depuis le serveur :8000
+    async with Client("http://127.0.0.1:8000/mcp") as client:
+        listing = await client.list_tools()
+    tools = getattr(listing, "tools", listing)
+    print("Tools on :8000")
+    for t in tools:
+        print(f"  {t.name}")
+
+    # 2. Ouvrir un dossier, puis écrire un fait, sur :8000
+    case = text_of(await call(8000, "open_case", subject=SUBJECT)).strip().strip('"')
+    print("\ncase handle:", case)
+    fact = text_of(await call(
+        8000, "remember", subject=SUBJECT, kind="preference",
+        fact="Prefers to be contacted by email not by phone")).strip().strip('"')
+    print("fact handle:", fact)
+
+    # 3. Utiliser le MÊME handle sur la deuxième instance, :8001
+    who = text_of(await call(8000, "case_subject", handle=case))
+    print(f"\n:8000 resolves {case} to: {who}")
+    recalled = text_of(await call(
+        8000, "recall", subject=SUBJECT, query="contacted email"))
+    print(":8000 recall:", recalled)
+    return 0
     raise NotImplementedError("TODO 6: list the catalog, then use a handle "
                               "across two instances")
 

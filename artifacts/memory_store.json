@@ -1,0 +1,38 @@
+{
+  "facts": [
+    {
+      "subject": "A. Muller",
+      "kind": "preference",
+      "text": "Prefers to be contacted by email not by phone",
+      "handle": "fact-41d4c034d816",
+      "written_at": "2026-10-29T15:56:02Z"
+    },
+    {
+      "subject": "A. Muller",
+      "kind": "preference",
+      "text": "Prefers to be contacted by email not by phone",
+      "handle": "fact-c7648ff86faf",
+      "written_at": "2026-10-29T15:58:00Z"
+    },
+    {
+      "subject": "A. Muller",
+      "kind": "preference",
+      "text": "Prefers to be contacted by email not by phone",
+      "handle": "fact-f96517145fc8",
+      "written_at": "2026-10-29T16:13:26Z"
+    },
+    {
+      "subject": "A. Muller",
+      "kind": "preference",
+      "text": "Prefers to be contacted by email not by phone",
+      "handle": "fact-c85937b37a43",
+      "written_at": "2026-10-29T16:13:33Z"
+    }
+  ],
+  "cases": {
+    "case-bf59d3052f1e": "A. Muller",
+    "case-1625ceac7040": "A. Muller",
+    "case-0dc0b68b2284": "A. Muller",
+    "case-01c535bd02f6": "A. Muller"
+  }
+}
