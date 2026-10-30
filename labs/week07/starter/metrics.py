@@ -49,6 +49,11 @@ def rank_of_first_gold(ranked_chunks, question) -> int | None:
     failure from appearing at rank forty, and the two must not be averaged
     together.
     """
+    keys = gold_keys(question)
+    for position, chunk in enumerate(ranked_chunks, start=1):   # rang 1-based
+        if chunk.key in keys:
+            return position
+    return None 
     raise NotImplementedError("TODO 2a: rank of the first gold chunk")
 
 
@@ -59,6 +64,11 @@ def recall_at_k(ranked_chunks, question, k: int = 5) -> float:
     that all appear should count once, or a question whose answer happens to
     be long scores higher for no reason.
     """
+    keys = gold_keys(question)
+    if not keys:         # question sans réponse dans le corpus
+        return 0.0
+    found = {chunk.key for chunk in ranked_chunks[:k]} & keys   # des sections, pas des chunks
+    return len(found) / len(keys)
     raise NotImplementedError("TODO 2b: recall at k, over sections")
 
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import re
 import urllib.request
+import chromadb
 
 from chunking import Chunk
 
@@ -34,6 +35,16 @@ def embed(texts: list[str], batch: int = 32) -> list[list[float]]:
     POST to f"{OLLAMA_URL}/api/embed" with a JSON body of
     {"model": EMBED_MODEL, "input": [...]} and read the "embeddings" key.
     """
+    vectors: list[list[float]] = []
+    for i in range(0, len(texts), batch):
+        body = json.dumps({"model": EMBED_MODEL,
+                           "input": texts[i:i + batch]}).encode()
+        request = urllib.request.Request(
+            f"{OLLAMA_URL}/api/embed", data=body,
+            headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(request, timeout=120) as response:
+            vectors.extend(json.loads(response.read())["embeddings"])
+    return vectors
     raise NotImplementedError("TODO 3a: embed in batches")
 
 
@@ -56,10 +67,26 @@ class DenseIndex:
         ids Chroma returns back to objects. Set self.dim so the brief's
         conditions line has something to record.
         """
-        raise NotImplementedError("TODO 3b: build the index")
+        client = chromadb.EphemeralClient()
+        self.collection = client.get_or_create_collection(
+            name, metadata={"hnsw:space": "cosine"})
+        self.by_id = {c.chunk_id: c for c in chunks}
+        embeddings = embed([c.text for c in chunks])
+        self.dim = len(embeddings[0])
+        self.collection.add(
+            ids=[c.chunk_id for c in chunks],
+            embeddings=embeddings,
+            metadatas=[{"doc_id": c.doc_id, "section": c.section}
+                       for c in chunks])
+        #raise NotImplementedError("TODO 3b: build the index")
 
     def search(self, query: str, k: int = 20) -> list[Chunk]:
         """Embed the query, ask the collection, map ids back to Chunks."""
+        vector = embed([query])[0]
+        result = self.collection.query(
+            query_embeddings=[vector],
+            n_results=min(k, len(self.by_id)))
+        return [self.by_id[i] for i in result["ids"][0]]
         raise NotImplementedError("TODO 3b: search the index")
 
 
@@ -74,4 +101,13 @@ def keyword_search(chunks: list[Chunk], query: str,
     Break ties deterministically, by chunk_id, or two runs of your own code
     will disagree and you will spend ten minutes blaming the embedder.
     """
+    terms = set(re.findall(r"\w+", query.lower()))
+    scored = []
+    for chunk in chunks:
+        words = set(re.findall(r"\w+", chunk.text.lower()))
+        score = len(terms & words)
+        if score > 0:                       # pas de correspondance = pas de résultat
+            scored.append((-score, chunk.chunk_id, chunk))
+    scored.sort(key=lambda t: (t[0], t[1]))  # score décroissant, puis chunk_id
+    return [chunk for _, _, chunk in scored[:k]]
     raise NotImplementedError("TODO 3c: term-overlap search")

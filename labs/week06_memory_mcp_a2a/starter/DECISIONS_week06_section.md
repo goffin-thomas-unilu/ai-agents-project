@@ -57,7 +57,7 @@ saying which way it went for you is the entry.]
 
 | server mode | status | Mcp-Session-Id | answered |
 | stateless_http=True |200 |None |True |
-| stateless_http=False |400 |38e58983cfdb4467b209732d95075f7c | false|
+| stateless_http=False |400 |present | false missing session ID|
 
 The error the session-mode server returned, quoted exactly:
 
