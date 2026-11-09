@@ -70,10 +70,13 @@ GOLD: list[GoldQuestion] = [
         "I have been asked to fill in form RB-1140b. What is it for?",
         ("RB-VIGNETTE::How to apply",),
         ("rare-token",),
-        "The query carries the string RB-1140b. Rare, exact, and "
-        "semantically empty, so dense retrieval is the wrong tool for it "
-        "and keyword search is the right one. Note that a superseded page "
-        "carries the near-identical string RB-1140a.",
+        "The query carries the string RB-1140b. It is rare and exact, but "
+        "dense retrieval still ranked the gold chunk first, on my index and "
+        "on the recorded run, while keyword search tied it on my index "
+        "(rank 1) and lost to it on the recorded run (rank 14). A rare "
+        "token is not a reliable case where keyword search beats dense "
+        "retrieval on this corpus. Note that a superseded page carries the "
+        "near-identical string RB-1140a.",
     ),
     GoldQuestion(
         "Q03",
