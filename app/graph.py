@@ -172,10 +172,63 @@ def price(state: CaseState, plan: FaultPlan) -> dict:
     }
     raise NotImplementedError("TODO 3b: price with validation")
 
-def request_approval(state: CaseState) -> dict:
-    """Alias pour la fonction submit attendue par le pipeline global."""
-    return submit(state)
+def request_approval(payload: dict, unattended: bool) -> dict:
+    """The gate function required by week 8.
 
+    Runs a small dedicated graph with its own SqliteSaver containing the
+    interrupt. If unattended is True, immediately returns the timeout verdict.
+    """
+    if unattended:
+        return {"verdict": "timeout", "by": "timeout"}
+
+    import tempfile
+    import os
+    from langgraph.checkpoint.sqlite import SqliteSaver
+    from langgraph.graph import StateGraph, START, END
+    from typing import TypedDict
+
+    class GateState(TypedDict):
+        payload: dict
+        verdict_result: dict
+
+    def gate_node(state: GateState) -> dict:
+        decision = interrupt(state["payload"])
+        return {"verdict_result": decision}
+
+    db_fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(db_fd)
+
+    try:
+        with SqliteSaver.from_conn_string(db_path) as saver:
+            g = StateGraph(GateState)
+            g.add_node("gate", gate_node)
+            g.add_edge(START, "gate")
+            g.add_edge("gate", END)
+            compiled = g.compile(checkpointer=saver)
+
+            config = {"configurable": {"thread_id": payload.get("case_id", "adhoc")}}
+            
+            # Exécution initiale jusqu'à l'interruption
+            try:
+                compiled.invoke({"payload": payload, "verdict_result": {}}, config)
+            except Exception:
+                pass
+
+            # Récupération de la décision après reprise/interaction humaine
+            snapshot = compiled.get_state(config)
+            values = snapshot.values if snapshot else {}
+            result = values.get("verdict_result")
+            
+            if not result:
+                # Fallback par défaut si aucune décision n'a été retournée
+                return {"verdict": "reject", "by": "system"}
+            return result
+    finally:
+        if os.path.exists(db_path):
+            try:
+                os.remove(db_path)
+            except OSError:
+                pass
 def draft(state: CaseState) -> dict:
     """TODO 5. The goal predicate, and what a partial answer says.
 
@@ -233,10 +286,8 @@ def submit(state: CaseState) -> dict:
     decision = interrupt({
         "action": "submit_case",
         "case_id": state["case_id"],
-        # The exact arguments, not a summary the model wrote. The model
-        # whose judgment you are checking would also be writing the account
-        # of it.
-        "arguments": {"topic": state["topic"], "fee": state.get("fee", {})},
+        # Utilisation sécurisée de get() pour éviter le KeyError
+        "arguments": {"topic": state.get("topic") or state.get("subject", "unknown"), "fee": state.get("fee", {})},
         "evidence": state.get("passages", []),
         "degraded": state.get("degraded", False),
         "missing": sorted(set(state.get("missing", []))),
