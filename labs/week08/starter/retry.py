@@ -72,6 +72,9 @@ def is_retryable(exc: BaseException) -> bool:
     a broken credential into a slow broken credential, and on some upstreams
     into a locked account.
     """
+    if isinstance(exc, ContractDrift):
+        return False
+    return isinstance(exc, (RateLimited, ServerError, ToolTimeout))
     raise NotImplementedError("TODO 1: which errors are retryable")
 
 
@@ -105,4 +108,68 @@ def call_with_policy(fn, *args, policy: StepPolicy, fallback=None,
     ladder skips past retrying straight to the fallback. If you find
     yourself retrying a drifted response, TODO 1 is wrong.
     """
+    result = StepResult()
+    t0 = time.perf_counter()
+
+    for n in range(1, policy.attempts + 1):
+        # 1. Vérification du temps écoulé global (max_elapsed)
+        if time.perf_counter() - t0 >= policy.max_elapsed:
+            result.attempts.append(Attempt(n=n, error="Max elapsed time exceeded", slept=0.0))
+            break
+
+        error_msg = None
+        try:
+            val = fn(*args, **kwargs)
+            if validate is not None:
+                validate(val)
+            
+            # Succès !
+            result.value = val
+            result.ok = True
+            result.outcome = "ok"
+            result.attempts.append(Attempt(n=n, error=None, slept=0.0))
+            return result
+
+        except BaseException as exc:
+            error_msg = str(exc)
+            
+            # Si l'erreur n'est pas réessayable (ex: ContractDrift), on arrête les retries immédiatement
+            if not is_retryable(exc):
+                result.attempts.append(Attempt(n=n, error=error_msg, slept=0.0))
+                break
+
+            if n == policy.attempts:
+                result.attempts.append(Attempt(n=n, error=error_msg, slept=0.0))
+                break
+
+            # Calcul du backoff exponentiel avec jitter
+            delay = policy.base_delay * (2 ** (n - 1))
+            if policy.jitter:
+                delay = random.uniform(0, delay)
+
+            if time.perf_counter() - t0 + delay >= policy.max_elapsed:
+                result.attempts.append(Attempt(n=n, error=error_msg, slept=0.0))
+                break
+
+            time.sleep(delay)
+            result.attempts.append(Attempt(n=n, error=error_msg, slept=delay))
+
+    # Échec des retries : tentative de fallback si disponible
+    if fallback is not None:
+        try:
+            result.value = fallback()
+            result.ok = True
+            result.used_fallback = True
+            result.outcome = "fallback"
+            return result
+        except Exception:
+            pass
+
+    # Épuisement total : application de la politique d'échec (degrade ou escalate)
+    result.ok = False
+    if policy.on_exhausted == "escalate":
+        result.outcome = "escalated"
+    else:
+        result.outcome = "degraded"
+    return result
     raise NotImplementedError("TODO 2: the retry ladder")
