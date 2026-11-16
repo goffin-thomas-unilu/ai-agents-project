@@ -50,7 +50,26 @@ def parse_amount(text: str | None) -> float | None:
     if not re.fullmatch(r"-?\d+(\.\d{1,2})?", s):
         return None
     return round(float(s), 2)
-
+def _parse_float(val) -> float | None:
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    cleaned = str(val).strip()
+    for sym in ["€", "$", "EUR", "GBP", "£", "\u00a0", " "]:
+        cleaned = cleaned.replace(sym, "")
+    # Gère le format européen "1.498,54" ou "1498,54"
+    if "," in cleaned and "." in cleaned:
+        if cleaned.rfind(",") > cleaned.rfind("."):
+            cleaned = cleaned.replace(".", "").replace(",", ".")
+        else:
+            cleaned = cleaned.replace(",", "")
+    elif "," in cleaned:
+        cleaned = cleaned.replace(",", ".")
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
 
 @dataclass
 class CheckReport:
@@ -89,6 +108,53 @@ def run_checks(fields: dict[str, str | None]) -> CheckReport:
     with each other will pass every one of these. Try it on paper before
     you decide your checks are finished.
     """
+    fired = []
+
+    net = _parse_float(fields.get("net_amount"))
+    vat = _parse_float(fields.get("vat_amount"))
+    total = _parse_float(fields.get("total_amount"))
+
+    parsed_amounts = {
+        "net": net,
+        "vat": vat,
+        "total": total,
+    }
+
+    # 1. Arithmetic: net + vat == total, to the cent
+    if net is not None and vat is not None and total is not None:
+        if abs((net + vat) - total) >= 0.01:
+            fired.append("arithmetic")
+
+    # 2. VAT rate: vat / net == VAT_RATE (0.17)
+    if net is not None and vat is not None and net > 0:
+        if abs((vat / net) - VAT_RATE) > 0.01:
+            fired.append("vat_rate")
+
+    # 3. Format: INVOICE_RE, PO_RE (optional on INV-002), CURRENCIES
+    inv = fields.get("invoice_number")
+    if inv is not None and str(inv).strip() != "":
+        if not INVOICE_RE.match(str(inv).strip()):
+            fired.append("invoice_format")
+
+    po = fields.get("purchase_order")
+    if po is not None and str(po).strip() != "":
+        if not PO_RE.match(str(po).strip()):
+            fired.append("po_format")
+
+    curr = fields.get("currency")
+    if curr is not None and str(curr).strip() != "":
+        if str(curr).strip() not in CURRENCIES:
+            fired.append("currency")
+
+    # 4. Plausibility: total in a reasonable range for this supplier
+    if total is not None:
+        if not (0.0 < total <= 100_000.0):
+            fired.append("plausibility")
+
+    return CheckReport(
+        parsed=parsed_amounts,
+        fired=fired,
+    )
     raise NotImplementedError("TODO 3: run_checks")
 
 

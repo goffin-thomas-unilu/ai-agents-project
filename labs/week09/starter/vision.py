@@ -17,6 +17,7 @@ import json
 import time
 import urllib.error
 import urllib.request
+import requests
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -105,6 +106,44 @@ def guard(content: str, thinking: str, done_reason: str,
     file: it feeds guard() each of these on purpose and expects a refusal.
     A guard that accepts them all is worth nothing.
     """
+    # a) done_reason == "length" (le contexte a été épuisé)
+    if done_reason == "length":
+        return None, "Generation stopped due to length limit"
+
+    # b) content est vide ou composé uniquement d'espaces
+    if not content or not content.strip():
+        reason = "Content is empty or whitespace"
+        # Dans guard() lorsque vous refusez :
+        print(f"[DEBUG GUARD REJECTION] Reason: {reason} | Content received: {content[:100]}")
+        if thinking and thinking.strip():
+            reason += f" (thinking present: {thinking[:100]})"
+        return None, reason
+
+    # c) Le contenu ne se parse pas en JSON ou n'est pas un objet (dict)
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError as err:
+        return None, f"JSON decode error: {err}"
+
+    if not isinstance(parsed, dict):
+        return None, "Parsed JSON is not a dictionary object"
+
+    # d) Une clé requise de `fields` est absente
+    for f in fields:
+        if f not in parsed:
+            return None, f"Missing required key: {f}"
+
+    # e) Toutes les valeurs sont None ou des chaînes vides (piège de l'objet vide)
+    all_blank = True
+    for f in fields:
+        val = parsed.get(f)
+        if val is not None and str(val).strip() != "":
+            all_blank = False
+            break
+    if all_blank:
+        return None, "All field values are None or blank strings"
+
+    return parsed, None
     raise NotImplementedError("TODO 1: guard")
 
 
@@ -123,11 +162,77 @@ def read_group(image_path: Path, group: str, fields: list[str],
     model read correctly, and passing `think=False` returns blanks. That is
     measured, not assumed.
     """
+    start_time = time.time()
     doc = image_path.stem
     if replay is not None:
         hit = replay.get(doc, group, variant)
         if hit is not None:
             return hit
+
+    sys_msg = system if system is not None else SYSTEM
+    user_prompt = prompt if prompt is not None else f"Extract the following fields for {group}: {', '.join(fields)}."
+    
+    encoded_image = encode(image_path, variant)
+
+    payload = {
+        "model": MODEL,
+        "stream": False,
+        "format": flat_schema(fields),
+        "options": {"temperature": 0.0},
+        "messages": [
+            {"role": "system", "content": sys_msg},
+            {
+                "role": "user",
+                "content": user_prompt,
+                "images": [encoded_image]
+            }
+        ]
+    }
+
+    try:
+        resp = requests.post(ENDPOINT, json=payload, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+        elapsed_s = time.time() - start_time
+    except Exception as e:
+        return VisionResult(
+            doc=doc,
+            group=group,
+            variant=variant,
+            fields={},
+            failure=str(e),
+            elapsed_s=0.0,
+            prompt_tokens=0,
+            output_tokens=0,
+            done_reason="error",
+            raw_content=""
+        )
+
+    message = data.get("message", {})
+    content = message.get("content", "")
+    thinking = message.get("thinking", "")
+    done_reason = data.get("done_reason", "stop")
+    prompt_eval_count = data.get("prompt_eval_count", 0)
+    eval_count = data.get("eval_count", 0)
+
+    parsed, failure = guard(content, thinking, done_reason, fields)
+
+    out = VisionResult(
+        doc=doc,
+        group=group,
+        variant=variant,
+        fields=parsed if parsed is not None else {},
+        failure=failure,
+        elapsed_s=elapsed_s, # (ou l'attribut de temps mesuré si présent)
+        prompt_tokens=prompt_eval_count,
+        output_tokens=eval_count,
+        done_reason=done_reason,
+        raw_content=content
+    )
+
+    if record is not None:
+        record.put(out)
+    return out
 
     # TODO 2. Build and send the request, then hand the response to guard.
     #

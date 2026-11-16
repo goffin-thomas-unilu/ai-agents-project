@@ -59,7 +59,12 @@ def _one(img: Image.Image, variant: str) -> Image.Image:
         # which is exactly where small dark text lives. A resize alone
         # keeps synthetic text crisp, which is measured in
         # WEEK09_FINDINGS.md and is why the sweep composes steps.
-        raise NotImplementedError("TODO 4a: jpeg")
+        if name == "jpeg":
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=int(arg))
+            buf.seek(0)
+            return Image.open(buf).convert("RGB")
+        #raise NotImplementedError("TODO 4a: jpeg")
 
     if name == "occlude":
         left, top, right, bottom = (float(v) for v in arg.split(","))
@@ -72,8 +77,7 @@ def _one(img: Image.Image, variant: str) -> Image.Image:
         return out
 
     if name == "blur":
-        # TODO 4b. One line, using ImageFilter.GaussianBlur and float(arg).
-        raise NotImplementedError("TODO 4b: blur")
+        return img.filter(ImageFilter.GaussianBlur(float(arg)))
 
     if name == "rotate":
         # A page fed slightly crooked into a scanner. Expand so nothing is
